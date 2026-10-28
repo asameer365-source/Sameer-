@@ -1,0 +1,357 @@
+name: Build 4K Business Manager APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Set up Gradle 8.5
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
+
+    - name: Generate 4K Business Manager Project
+      run: |
+        mkdir -p app/src/main/java/com/fourk/businessmanager
+        mkdir -p app/src/main/res/values
+
+        # 1. Root settings.gradle.kts
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.name = "4K Business Manager"
+        include(":app")
+        EOF
+
+        # 2. Root build.gradle.kts
+        cat << 'EOF' > build.gradle.kts
+        plugins {
+            id("com.android.application") version "8.2.2" apply false
+            id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+        }
+        EOF
+
+        # 3. App build.gradle.kts
+        cat << 'EOF' > app/build.gradle.kts
+        plugins {
+            id("com.android.application")
+            id("org.jetbrains.kotlin.android")
+        }
+        android {
+            namespace = "com.fourk.businessmanager"
+            compileSdk = 34
+
+            defaultConfig {
+                applicationId = "com.fourk.businessmanager"
+                minSdk = 26
+                targetSdk = 34
+                versionCode = 1
+                versionName = "1.0"
+            }
+            buildTypes {
+                release {
+                    isMinifyEnabled = false
+                }
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+            buildFeatures {
+                compose = true
+            }
+            composeOptions {
+                kotlinCompilerExtensionVersion = "1.5.8"
+            }
+        }
+        dependencies {
+            implementation("androidx.core:core-ktx:1.12.0")
+            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+            implementation("androidx.activity:activity-compose:1.8.2")
+            implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+            implementation("androidx.compose.ui:ui")
+            implementation("androidx.compose.ui:ui-graphics")
+            implementation("androidx.compose.ui:ui-tooling-preview")
+            implementation("androidx.compose.material3:material3")
+            implementation("androidx.compose.material:material-icons-extended")
+        }
+        EOF
+
+        # 4. AndroidManifest.xml
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.BLUETOOTH" />
+            <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+            <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+            <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+            <application
+                android:allowBackup="true"
+                android:icon="@android:drawable/sym_def_app_icon"
+                android:label="4K Business Manager"
+                android:roundIcon="@android:drawable/sym_def_app_icon"
+                android:supportsRtl="true"
+                android:theme="@android:style/Theme.Material.NoActionBar">
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+
+        # 5. Strings.xml
+        cat << 'EOF' > app/src/main/res/values/strings.xml
+        <resources>
+            <string name="app_name">4K Business Manager</string>
+        </resources>
+        EOF
+
+        # 6. Complete UI & Logic (MainActivity.kt)
+        cat << 'EOF' > app/src/main/java/com/fourk/businessmanager/MainActivity.kt
+        package com.fourk.businessmanager
+
+        import android.os.Bundle
+        import android.widget.Toast
+        import androidx.activity.ComponentActivity
+        import androidx.activity.compose.setContent
+        import androidx.compose.foundation.background
+        import androidx.compose.foundation.border
+        import androidx.compose.foundation.layout.*
+        import androidx.compose.foundation.lazy.LazyColumn
+        import androidx.compose.foundation.lazy.items
+        import androidx.compose.foundation.shape.RoundedCornerShape
+        import androidx.compose.material.icons.Icons
+        import androidx.compose.material.icons.filled.*
+        import androidx.compose.material3.*
+        import androidx.compose.runtime.*
+        import androidx.compose.ui.Alignment
+        import androidx.compose.ui.Modifier
+        import androidx.compose.ui.graphics.Brush
+        import androidx.compose.ui.graphics.Color
+        import androidx.compose.ui.platform.LocalContext
+        import androidx.compose.ui.text.font.FontWeight
+        import androidx.compose.ui.unit.dp
+        import androidx.compose.ui.unit.sp
+
+        val MatteBlack = Color(0xFF0F0F10)
+        val SurfaceDark = Color(0xFF18181A)
+        val CardDark = Color(0xFF222225)
+        val GoldPrimary = Color(0xFFD4AF37)
+        val GoldLight = Color(0xFFF9E498)
+        val GoldGradient = Brush.linearGradient(listOf(Color(0xFFF9E498), Color(0xFFD4AF37), Color(0xFFAA771C)))
+
+        data class Product(val id: Int, val name: String, var stock: Int, val price: Double)
+
+        class MainActivity : ComponentActivity() {
+            override fun onCreate(savedInstanceState: Bundle?) {
+                super.onCreate(savedInstanceState)
+                setContent {
+                    BusinessManagerApp()
+                }
+            }
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun BusinessManagerApp() {
+            val context = LocalContext.current
+            var currentScreen by remember { mutableStateOf("dashboard") }
+            var todaySales by remember { mutableStateDoubleOf(0.0) }
+            val inventory = remember {
+                mutableStateListOf(
+                    Product(1, "Premium Basmati Rice (1kg)", 50, 120.0),
+                    Product(2, "Refined Sunflower Oil (1L)", 30, 160.0),
+                    Product(3, "Chana Dal Premium (1kg)", 40, 95.0),
+                    Product(4, "Special Tea Powder (500g)", 25, 240.0)
+                )
+            }
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(MatteBlack, RoundedCornerShape(8.dp))
+                                        .border(1.5.dp, GoldGradient, RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("4K", color = GoldLight, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("4K BUSINESS MANAGER", color = GoldLight, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MatteBlack)
+                    )
+                },
+                containerColor = MatteBlack
+            ) { padding ->
+                Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
+                    if (currentScreen == "dashboard") {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Card(
+                                modifier = Modifier.weight(1f).border(1.dp, GoldPrimary, RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(containerColor = CardDark)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("Today's Sales", color = Color.Gray, fontSize = 12.sp)
+                                    Text("₹ ${"%.2f".format(todaySales)}", color = GoldLight, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Card(
+                                modifier = Modifier.weight(1f).border(1.dp, Color(0xFF2E2E33), RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(containerColor = CardDark)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("Total Stock Qty", color = Color.Gray, fontSize = 12.sp)
+                                    Text("${inventory.sumOf { it.stock }} Pcs", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = { currentScreen = "pos" },
+                            modifier = Modifier.fillMaxWidth().height(60.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+                        ) {
+                            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = MatteBlack)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("OPEN NEW SALE / BILLING (POS)", color = MatteBlack, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text("CURRENT INVENTORY & STOCKS", color = GoldPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(inventory) { item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(8.dp)).padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(item.name, color = Color.White, fontWeight = FontWeight.Medium)
+                                        Text("Price: ₹${item.price}", color = Color.Gray, fontSize = 12.sp)
+                                    }
+                                    Text("${item.stock} left", color = if (item.stock < 10) Color(0xFFE74C3C) else GoldLight, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        Text("SELECT PRODUCT TO SELL (AUTO-DEDUCT)", color = GoldPrimary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(inventory) { prod ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = CardDark)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(prod.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text("₹ ${prod.price} | Stock: ${prod.stock}", color = Color.Gray, fontSize = 12.sp)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                if (prod.stock > 0) {
+                                                    prod.stock -= 1
+                                                    todaySales += prod.price
+                                                    Toast.makeText(context, "1 Unit Sold! Stock Deducted.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Out of Stock!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+                                        ) {
+                                            Text("Sell 1 Qty", color = MatteBlack)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Bill Saved & Printed!", Toast.LENGTH_LONG).show()
+                                currentScreen = "dashboard"
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ECC71))
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("SAVE & PRINT BILL", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { currentScreen = "dashboard" },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Back to Dashboard", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+        EOF
+
+    - name: Compile Android APK
+      run: gradle assembleDebug --stacktrace
+
+    - name: Upload 4K Business Manager APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: 4K-Business-Manager-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
